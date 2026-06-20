@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isLoggedIn() { return request.auth != null; }
+    function isAdmin() { return request.auth.token.email == 'junbsd@gmail.com'; }
+    function isApproved() {
+      return isAdmin() || (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'blocked'
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+    }
+    match /teams/{teamId} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+    }
+    match /works/{workId} {
+      allow read, write: if isApproved();
+    }
+    match /expenses/{expenseId} {
+      allow read, write: if isApproved();
+    }
+    match /clients/{id} {
+      allow read, write: if isApproved();
+    }
+    match /equipment/{id} {
+      allow read, write: if isApproved();
+    }
+  }
+}

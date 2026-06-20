@@ -1,0 +1,8 @@
+{
+  "name": "baekan-backup",
+  "version": "1.0.0",
+  "description": "배관사무소 작업일지 백업 도구",
+  "main": "backup.js",
+  "scripts": { "start": "node backup.js" },
+  "dependencies": { "firebase-admin": "^12.0.0" }
+}
