@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/baekan-app/static/js/main.52e943e2.js",
+    "main.js": "/baekan-app/static/js/main.48780e7d.js",
     "index.html": "/baekan-app/index.html",
-    "main.52e943e2.js.map": "/baekan-app/static/js/main.52e943e2.js.map"
+    "main.48780e7d.js.map": "/baekan-app/static/js/main.48780e7d.js.map"
   },
   "entrypoints": [
-    "static/js/main.52e943e2.js"
+    "static/js/main.48780e7d.js"
   ]
 }
