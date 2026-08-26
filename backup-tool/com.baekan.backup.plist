@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.baekan.backup</string>
+
+    <!-- ⚠️ 아래 두 경로를 본인 환경에 맞게 수정하세요 -->
+    <!-- node 경로 확인: 터미널에서 `which node` 입력 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/Users/내사용자명/baekan-app/backup-tool/backup.js</string>
+    </array>
+
+    <!-- 매월 1일 새벽 3시 실행 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- backup.js와 같은 폴더에서 실행되어야 함 (serviceAccountKey.json 찾기 위해) -->
+    <key>WorkingDirectory</key>
+    <string>/Users/내사용자명/baekan-app/backup-tool</string>
+
+    <!-- 실행 로그 저장 위치 -->
+    <key>StandardOutPath</key>
+    <string>/Users/내사용자명/baekan-app/backup-tool/backup_log.txt</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/내사용자명/baekan-app/backup-tool/backup_error.txt</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
