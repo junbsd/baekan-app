@@ -389,6 +389,20 @@ export default function WorkList({ works, profile }) {
   const [showDetail, setShowDetail] = useState(false);
   const [opinionCountByWork, setOpinionCountByWork] = useState({});
   const [quickLightbox, setQuickLightbox] = useState(null); // {images:[...], index:n}
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState(null); // 입금확인 처리 중인 작업 id
+
+  // 외상 건을 "입금 확인" 처리 - 결제방식을 현금(cash)으로 전환한다.
+  // (요구사항: 계좌이체 등 다른 수단으로 실제 받았더라도, 입금확인 시에는 무조건 현금으로 전환)
+  const handleConfirmPayment = async (work) => {
+    if (!window.confirm(`"${work.clientCompany}" 건 ${fmt.money(work.netAmount||work.amount)}을(를) 입금 확인 처리할까요?\n결제방식이 "외상"에서 "현금"으로 변경됩니다.`)) return;
+    setConfirmingPaymentId(work.id);
+    try {
+      await updateDoc(doc(db, "works", work.id), { payment: "cash", updatedAt: new Date().toISOString() });
+    } catch (e) {
+      alert("입금확인 처리 중 오류: " + e.message);
+    }
+    setConfirmingPaymentId(null);
+  };
 
   // 소견서 작성 여부 배지 표시용 — workId별 개수만 집계 (쿼리 1회)
   useEffect(() => {
@@ -614,13 +628,24 @@ export default function WorkList({ works, profile }) {
           <span style={{ fontSize:14, fontWeight:700, color:C.red }}>{fmt.money(fee)}</span>
         </div>
         <div style={{ display:"flex", gap:10 }}>
-          {[["현금",cash,C.green],["카드",card,C.blue],["외상",credit,C.yellow]].map(([l,v,c])=>(
-            <div key={l} style={{ flex:1, textAlign:"center" }}>
-              <div style={{ fontSize:10, color:C.text3 }}>{l}</div>
-              <div style={{ fontSize:13, fontWeight:700, color:c }}>{fmt.money(v)}</div>
-            </div>
-          ))}
+          {[["현금","cash",cash,C.green],["카드","card",card,C.blue],["외상","credit",credit,C.yellow]].map(([l,payKey,v,c])=>{
+            const isActive = filterPay===payKey;
+            return (
+              <button key={l} data-testid={`pay-filter-${payKey}`} onClick={()=>setFilterPay(isActive?"":payKey)}
+                style={{ flex:1, textAlign:"center", background:isActive?`${c}18`:"transparent",
+                  border:`1px solid ${isActive?c:"transparent"}`, borderRadius:8, padding:"6px 4px", cursor:"pointer" }}>
+                <div style={{ fontSize:10, color:isActive?c:C.text3, fontWeight:isActive?700:400 }}>{l}</div>
+                <div style={{ fontSize:13, fontWeight:700, color:c }}>{fmt.money(v)}</div>
+              </button>
+            );
+          })}
         </div>
+        {filterPay && (
+          <button onClick={()=>setFilterPay("")}
+            style={{ ...S.btnSmall(C.text3), width:"100%", marginTop:10, fontSize:12 }}>
+            ✕ 필터 해제 (전체 보기)
+          </button>
+        )}
       </div>
 
       {/* 작업 목록 */}
@@ -649,6 +674,14 @@ export default function WorkList({ works, profile }) {
             <div style={{ textAlign:"right", marginLeft:8 }}>
               {w.feeRate>0&&<div style={{ fontSize:10, color:C.text3, textDecoration:"line-through" }}>{fmt.money(w.amount)}</div>}
               <div style={{ fontSize:16, fontWeight:800, color:C.green }}>{fmt.money(w.netAmount||w.amount)}</div>
+              {w.payment==="credit" && (
+                <button onClick={e=>{ e.stopPropagation(); handleConfirmPayment(w); }}
+                  disabled={confirmingPaymentId===w.id}
+                  style={{ ...S.btnSmall(C.yellow), fontSize:11, padding:"4px 8px", marginTop:6,
+                    opacity:confirmingPaymentId===w.id?0.6:1 }}>
+                  {confirmingPaymentId===w.id?"처리 중...":"✅ 입금확인"}
+                </button>
+              )}
             </div>
           </div>
           {workImages.length>0 && (
