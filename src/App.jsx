@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import WorkForm from "./pages/WorkForm";
 import WorkList from "./pages/WorkList";
 import ExpenseList from "./pages/ExpenseList";
+import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import AdminPage from "./pages/AdminPage";
 import AccessDenied from "./pages/AccessDenied";
@@ -53,22 +54,24 @@ function LoginScreen() {
   );
 }
 
-const getNavItems = (isAdmin) => {
+const getNavItems = (isAdmin, canUseSchedule) => {
   const base = [
     { id:"dashboard", icon:"📊", label:"대시보드" },
     { id:"work",      icon:"🔧", label:"작업입력" },
     { id:"estimate",  icon:"📋", label:"견적서" },
     { id:"revenue",   icon:"💰", label:"매출" },
     { id:"expense",   icon:"📉", label:"지출" },
-    { id:"settings",  icon:"⚙️", label:"설정" },
   ];
+  // 일정 사용 권한이 있는 사람에게만 하단 메뉴에 노출 (세부견적서/간이영수증과 같은 방식)
+  if (canUseSchedule) base.push({ id:"schedule", icon:"📅", label:"일정" });
+  base.push({ id:"settings", icon:"⚙️", label:"설정" });
   if (isAdmin) base.push({ id:"admin", icon:"👑", label:"관리" });
   return base;
 };
 
 const TITLES = {
   dashboard:"배관사무소", work:"작업입력", estimate:"견적서", revenue:"매출일지",
-  expense:"지출일지", settings:"설정", admin:"관리자"
+  expense:"지출일지", schedule:"일정", settings:"설정", admin:"관리자"
 };
 
 export default function App() {
@@ -78,6 +81,8 @@ export default function App() {
   const [needProfile, setNeedProfile] = useState(false);
   const [tab, setTab] = useState("dashboard");
   const [estimateKind, setEstimateKind] = useState(null); // null(선택화면) | "simple" | "detailed"
+  const [revenueFilter, setRevenueFilter] = useState(null); // 대시보드/일정에서 넘어온 매출일지 초기 필터
+  const [scheduleForWork, setScheduleForWork] = useState(null); // 일정에서 "작업일지 작성"으로 넘어온 경우 그 일정 정보
   const [works, setWorks] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
@@ -91,6 +96,8 @@ export default function App() {
   const canUseDetailedEstimate = isAdmin || profile?.canUseDetailedEstimate === true;
   // 간이영수증 사용 권한: 세부견적서와 동일한 방식(관리자가 개별로 켜줌, 기본값 false)
   const canUseReceipt = isAdmin || profile?.canUseReceipt === true;
+  // 일정 사용 권한: 세부견적서/간이영수증과 동일한 방식(관리자가 개별로 켜줌, 기본값 false)
+  const canUseSchedule = isAdmin || profile?.canUseSchedule === true;
 
   // Auth 감지
   useEffect(() => {
@@ -185,7 +192,18 @@ export default function App() {
   const handleProfileSave = (p) => { setProfile(p); setNeedProfile(false); };
   const handleLogout = async () => {
     await signOut(auth);
-    setUser(null); setProfile(null); setWorks([]); setExpenses([]);
+    setUser(null); setProfile(null); setWorks([]); setExpenses([]); setScheduleForWork(null); setRevenueFilter(null);
+  };
+  // 대시보드 등에서 탭 전환 시 매출일지 초기 필터를 함께 넘길 수 있도록 함
+  // (예: 순이익 카드 클릭 -> 이번달 필터, 결제수단 클릭 -> 이번달+해당 결제수단 필터)
+  const handleTabChange = (nextTab, filter) => {
+    setTab(nextTab);
+    setRevenueFilter(nextTab === "revenue" ? (filter || null) : null);
+  };
+  // 일정 화면에서 "이 일정으로 작업일지 작성"을 누르면, 그 일정 정보를 들고 작업입력 탭으로 이동한다.
+  const startWorkFromSchedule = (schedule) => {
+    setScheduleForWork(schedule);
+    setTab("work");
   };
 
   if (authLoading) return <div style={S.app}><Loading /></div>;
@@ -194,7 +212,7 @@ export default function App() {
   if (!profile) return <div style={S.app}><Loading /></div>;
   if (isBlocked || isPending) return <div style={S.app}><AccessDenied user={user} role={userRole} /></div>;
 
-  const navItems = getNavItems(isAdmin);
+  const navItems = getNavItems(isAdmin, canUseSchedule);
 
   // 역할 배지
   const roleBadge = () => {
@@ -220,8 +238,11 @@ export default function App() {
         </div>
       </div>
 
-      {tab==="dashboard" && <Dashboard works={works} expenses={expenses} profile={profile} onTabChange={setTab} />}
-      {tab==="work"      && <WorkForm profile={profile} userRole={userRole} userTeamId={userTeamId} onSaved={()=>setTab("dashboard")} />}
+      {tab==="dashboard" && <Dashboard works={works} expenses={expenses} profile={profile} onTabChange={handleTabChange} />}
+      {tab==="work"      && <WorkForm profile={profile} userRole={userRole} userTeamId={userTeamId}
+        fromSchedule={scheduleForWork}
+        onSaved={()=>{ setScheduleForWork(null); setTab("dashboard"); }}
+        onCancel={scheduleForWork ? ()=>{ setScheduleForWork(null); setTab("schedule"); } : undefined} />}
       {tab==="estimate"  && estimateKind===null && (
         <EstimatePicker onSelect={setEstimateKind} canUseDetailed={canUseDetailedEstimate} canUseReceipt={canUseReceipt} />
       )}
@@ -235,15 +256,18 @@ export default function App() {
       {tab==="estimate"  && estimateKind==="receipt" && canUseReceipt && (
         <ReceiptForm profile={profile} onBack={()=>setEstimateKind(null)} />
       )}
-      {tab==="revenue"   && <WorkList works={works} profile={profile} />}
+      {tab==="revenue"   && <WorkList works={works} profile={profile} initialFilter={revenueFilter} />}
       {tab==="expense"   && <ExpenseList expenses={expenses} userRole={userRole} userTeamId={userTeamId} profile={profile} />}
+      {tab==="schedule"  && canUseSchedule && (
+        <Schedule works={works} profile={profile} onStartWork={startWorkFromSchedule} onTabChange={handleTabChange} />
+      )}
       {tab==="settings"  && <Settings user={user} profile={profile}
         onProfileUpdate={p=>setProfile(prev=>({...prev,...p}))} onLogout={handleLogout} />}
       {tab==="admin" && isAdmin && <AdminPage user={user} />}
 
       <nav style={S.nav}>
         {navItems.map(({id,icon,label})=>(
-          <button key={id} style={S.navBtn(tab===id)} onClick={()=>{ setTab(id); if (id==="estimate") setEstimateKind(null); }}>
+          <button key={id} style={S.navBtn(tab===id)} onClick={()=>{ setTab(id); setRevenueFilter(null); setScheduleForWork(null); if (id==="estimate") setEstimateKind(null); }}>
             <span style={{ fontSize:20 }}>{icon}</span>
             <span>{label}</span>
           </button>

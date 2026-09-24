@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, addDoc, doc, updateDoc, onSnapshot, query, orderBy, setDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, doc, updateDoc, onSnapshot, query, orderBy, setDoc, getDoc, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import { S, C, fmt, PAY_LABEL } from "../styles/theme";
 import TagInput from "../components/TagInput";
@@ -27,17 +27,21 @@ const calcNet = (amount, feeRate) => {
   return Math.max(0, Number(amount) - calcFee(amount, feeRate));
 };
 
-export default function WorkForm({ profile, editWork=null, onSaved, onCancel, userRole, userTeamId }) {
+export default function WorkForm({ profile, editWork=null, onSaved, onCancel, userRole, userTeamId, fromSchedule=null }) {
   const isEdit = !!editWork;
+  // 일정에서 넘어온 경우, 일정에 입력된 값만 미리 채운다.
+  // (일정 단계에서는 미확정인 청구금액/장비/작업시간/결제방식/사진은 채우지 않고 비워둔다)
   const emptyForm = {
-    date: fmt.today(),
+    date: fromSchedule?.date || fmt.today(),
     workerCompany: profile.companyName||"",
-    clientCompany:"", location:"", content:"",
+    clientCompany: fromSchedule?.clientCompany || "",
+    location: fromSchedule?.location || "",
+    content: fromSchedule?.content || "",
     equipment:[], workHours:"", amount:"",
     feeRate: 30,          // 수수료율 (기본 30%)
     feeAmount: 0,         // 수수료 금액
     netAmount: 0,         // 실수령액 (amount - feeAmount)
-    payment:"cash", memo:"",
+    payment:"cash", memo: fromSchedule?.memo || "",
     workerName: profile.name, workerPhone: profile.phone,
     signatureUrl: profile.signatureUrl || "",
   };
@@ -141,7 +145,24 @@ export default function WorkForm({ profile, editWork=null, onSaved, onCancel, us
       } else {
         data.createdAt = new Date().toISOString();
         data.createdByUid = profile.uid; // 개인(private) 사용자 데이터 분리를 위해 작성자 uid 기록
-        await addDoc(collection(db,"works"), data);
+        if (fromSchedule) {
+          // 일정에서 작성한 경우: 작업일지 생성 + 해당 일정을 "완료"로 표시하는 것을
+          // 하나의 배치로 묶어 둘 중 하나만 반영되는 상황(예: 중복 작업일지)을 방지한다.
+          data.scheduleId = fromSchedule.id;
+          const workRef = doc(collection(db,"works"));
+          const batch = writeBatch(db);
+          batch.set(workRef, data);
+          batch.update(doc(db,"schedules",fromSchedule.id), {
+            status: "완료",
+            workId: workRef.id,
+            completedByUid: profile.uid,
+            completedByName: profile.name,
+            updatedAt: new Date().toISOString(),
+          });
+          await batch.commit();
+        } else {
+          await addDoc(collection(db,"works"), data);
+        }
         if (form.clientCompany) await addClient(form.clientCompany);
         for (const e of form.equipment) await addEquipment(e);
       }
@@ -163,6 +184,16 @@ export default function WorkForm({ profile, editWork=null, onSaved, onCancel, us
         <div style={S.sectionTitle}>{isEdit?"작업 수정":"작업 기록 입력"}</div>
       </div>
       {saved && <div style={S.toast(true)}>✅ {isEdit?"수정":"저장"}되었습니다!</div>}
+      {fromSchedule && !isEdit && (
+        <div style={{ ...S.card, border:`1px solid ${C.blue}40`, background:"rgba(59,130,246,0.08)" }}>
+          <div style={{ fontSize:12, color:C.blue, fontWeight:700 }}>
+            📅 {fmt.date(fromSchedule.date)}{fromSchedule.time?` · ${fromSchedule.time}`:""} 일정으로 작성 중
+          </div>
+          <div style={{ fontSize:11, color:C.text4, marginTop:2 }}>
+            저장하면 이 일정이 자동으로 "완료" 처리됩니다. 아래 내용은 자유롭게 수정할 수 있습니다.
+          </div>
+        </div>
+      )}
 
       {/* 기본정보 */}
       <div style={S.card}>

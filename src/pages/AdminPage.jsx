@@ -209,6 +209,7 @@ function UserCard({ user, teams }) {
   const [changing, setChanging] = useState(false);
   const [togglingDetailed, setTogglingDetailed] = useState(false);
   const [togglingReceipt, setTogglingReceipt] = useState(false);
+  const [togglingSchedule, setTogglingSchedule] = useState(false);
   const [selectedRole, setSelectedRole] = useState(user.role === "shared" ? "team" : (user.role || "pending"));
   const [selectedTeam, setSelectedTeam] = useState(user.teamId || "");
   const isAdmin = user.email === ADMIN_EMAIL;
@@ -262,6 +263,20 @@ function UserCard({ user, teams }) {
       });
     } catch(e) { alert("변경 오류: " + e.message); }
     setTogglingReceipt(false);
+  };
+
+  // 일정(스케줄) 사용 허용 토글 - users 문서와 workerDirectory 문서에 함께 반영한다.
+  // (담당자 선택 목록은 workerDirectory를 canUseSchedule==true 조건으로 조회하므로 두 곳 모두 갱신 필요)
+  const handleToggleSchedule = async () => {
+    setTogglingSchedule(true);
+    const next = !user.canUseSchedule;
+    const updatedAt = new Date().toISOString();
+    try {
+      await updateDoc(doc(db, "users", user.id), { canUseSchedule: next, updatedAt });
+      // workerDirectory 문서가 없는 과거 사용자도 있을 수 있어 setDoc(merge:true) 사용
+      await setDoc(doc(db, "workerDirectory", user.id), { canUseSchedule: next, updatedAt }, { merge: true });
+    } catch(e) { alert("변경 오류: " + e.message); }
+    setTogglingSchedule(false);
   };
 
   const handleDeleteUser = async () => {
@@ -380,6 +395,39 @@ function UserCard({ user, teams }) {
           >
             <span style={{
               position:"absolute", top:3, left: user.canUseReceipt ? 23 : 3,
+              width:20, height:20, borderRadius:"50%", background:"#fff",
+              boxShadow:"0 1px 3px rgba(0,0,0,0.4)", transition:"left 0.2s ease",
+            }} />
+          </button>
+        </div>
+      )}
+
+      {/* 일정 사용 허용 토글 (관리자 본인은 항상 사용 가능하므로 표시하지 않음) */}
+      {!isAdmin && (
+        <div style={{
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+          marginTop:8, background:"rgba(255,255,255,0.03)", border:`1px solid ${C.border}`,
+          borderRadius:10, padding:"8px 12px",
+        }}>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:C.text }}>📅 일정 사용 허용</div>
+            <div style={{ fontSize:10.5, color:C.text4, marginTop:1 }}>
+              {user.canUseSchedule ? "이 사용자는 일정을 사용할 수 있습니다 (모든 일정 공유)" : "기본적으로 꺼져 있습니다"}
+            </div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={!!user.canUseSchedule}
+            onClick={handleToggleSchedule}
+            disabled={togglingSchedule}
+            style={{
+              position:"relative", width:46, height:26, borderRadius:13, border:"none", cursor:"pointer",
+              background: user.canUseSchedule ? C.green : "rgba(255,255,255,0.16)",
+              transition:"background 0.2s ease", flexShrink:0, padding:0, opacity: togglingSchedule ? 0.6 : 1,
+            }}
+          >
+            <span style={{
+              position:"absolute", top:3, left: user.canUseSchedule ? 23 : 3,
               width:20, height:20, borderRadius:"50%", background:"#fff",
               boxShadow:"0 1px 3px rgba(0,0,0,0.4)", transition:"left 0.2s ease",
             }} />

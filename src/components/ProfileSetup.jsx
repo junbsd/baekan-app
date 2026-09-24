@@ -29,6 +29,9 @@ export default function ProfileSetup({ user, onComplete }) {
         approved: isAdmin ? true : false,
         canUseDetailedEstimate: false, // 세부견적서 사용 권한은 관리자가 개별로 켜줘야 함(기본값 꺼짐)
         canUseReceipt: false, // 간이영수증 사용 권한도 동일한 방식(기본값 꺼짐)
+        // 일정(스케줄) 사용 권한도 동일한 방식(기본값 꺼짐). 관리자 본인만 가입 즉시 true로 저장해서
+        // workerDirectory 조회만으로 담당자 후보 목록에 관리자가 항상 포함되도록 한다.
+        canUseSchedule: isAdmin ? true : false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -38,6 +41,8 @@ export default function ProfileSetup({ user, onComplete }) {
       await setDoc(doc(db,"workerDirectory",user.uid), {
         name: userData.name, companyName: userData.companyName, phone: userData.phone,
         businessNumber: "", companyAddress: "", signatureUrl: "",
+        // 일정 담당자 선택 목록을 workerDirectory 쿼리만으로 걸러내기 위해 함께 저장한다.
+        canUseSchedule: userData.canUseSchedule,
         updatedAt: userData.updatedAt,
       });
       onComplete(userData);

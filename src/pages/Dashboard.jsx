@@ -381,6 +381,12 @@ export default function Dashboard({ works, expenses, profile, onTabChange }) {
 
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+
+  // 매출일지로 이동하면서 이번달 + (선택적) 결제수단 필터를 함께 적용한다.
+  const goToRevenue = (payment) => {
+    onTabChange("revenue", { month: ym, payment: payment || "" });
+  };
+
   const mW = works.filter(w=>fmt.monthKey(w.date)===ym);
   const mE = expenses.filter(e=>fmt.monthKey(e.date)===ym);
   const revenue = mW.reduce((s,w)=>s+(Number(w.netAmount||w.amount)||0),0);
@@ -411,8 +417,10 @@ export default function Dashboard({ works, expenses, profile, onTabChange }) {
         <div style={{ fontSize:12, color:C.text4, marginTop:2 }}>{fmt.monthLabel(ym)} 현황</div>
       </div>
 
-      {/* 순이익 카드 */}
-      <div style={{ background:`linear-gradient(135deg,${C.blueDark},${C.blue})`, borderRadius:18, padding:22, marginBottom:12 }}>
+      {/* 순이익 카드 - 클릭 시 이번달 매출일지로 이동 */}
+      <button onClick={()=>goToRevenue()}
+        style={{ display:"block", width:"100%", textAlign:"left", cursor:"pointer", border:"none",
+          background:`linear-gradient(135deg,${C.blueDark},${C.blue})`, borderRadius:18, padding:22, marginBottom:12 }}>
         <div style={{ fontSize:12, color:"rgba(255,255,255,0.7)", marginBottom:2 }}>이번달 순이익</div>
         <div style={{ fontSize:34, fontWeight:800, color:"#fff", letterSpacing:"-1px" }}>{fmt.money(profit)}</div>
         <div style={{ height:1, background:"rgba(255,255,255,0.2)", margin:"12px 0" }} />
@@ -421,13 +429,15 @@ export default function Dashboard({ works, expenses, profile, onTabChange }) {
           <div><span style={{ color:"rgba(255,255,255,0.6)" }}>지출 </span><span style={{ color:"#fca5a5", fontWeight:700 }}>{fmt.money(expense)}</span></div>
           <div><span style={{ color:"rgba(255,255,255,0.6)" }}>작업 </span><span style={{ color:"#fff", fontWeight:700 }}>{mW.length}건</span></div>
         </div>
-      </div>
+      </button>
 
-      {/* 결제수단별 */}
+      {/* 결제수단별 - 클릭 시 해당 결제수단으로 필터된 매출일지로 이동 */}
       <div style={S.card}>
         <div style={S.cardTitle}>결제수단별 매출</div>
-        {[["💵 현금",cash,C.green],["💳 카드",card,C.blue],["⏳ 외상",credit,C.yellow]].map(([l,v,c])=>(
-          <div key={l} style={{ marginBottom:8 }}>
+        {[["💵 현금","cash",cash,C.green],["💳 카드","card",card,C.blue],["⏳ 외상","credit",credit,C.yellow]].map(([l,payKey,v,c])=>(
+          <button key={l} onClick={()=>goToRevenue(payKey)}
+            style={{ display:"block", width:"100%", textAlign:"left", cursor:"pointer",
+              border:"none", background:"none", padding:0, marginBottom:8 }}>
             <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
               <span style={{ fontSize:12, color:C.text2 }}>{l}</span>
               <span style={{ fontSize:13, fontWeight:700, color:c }}>{fmt.money(v)}</span>
@@ -435,7 +445,7 @@ export default function Dashboard({ works, expenses, profile, onTabChange }) {
             <div style={{ height:5, background:"rgba(255,255,255,0.06)", borderRadius:3, overflow:"hidden" }}>
               <div style={{ height:"100%", background:c, borderRadius:3, width:revenue>0?`${(v/revenue)*100}%`:"0%", transition:"width 0.8s" }} />
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -443,7 +453,7 @@ export default function Dashboard({ works, expenses, profile, onTabChange }) {
       <div style={S.card}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div style={S.cardTitle}>이번달 수수료 합계</div>
-          <span style={{ fontSize:17, fontWeight:800, color:C.red }}>{fmt.money(fee)}</span>
+          <span style={{ fontSize:13, fontWeight:700, color:C.red }}>{fmt.money(fee)}</span>
         </div>
         <div style={{ fontSize:11, color:C.text4, marginTop:2 }}>
           청구금액 {fmt.money(mW.reduce((s,w)=>s+(Number(w.amount)||0),0))} 중 수수료로 나간 금액

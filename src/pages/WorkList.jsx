@@ -235,6 +235,17 @@ function WorkDetailModal({ work, profile, onClose, onEdit, onDeleted }) {
     try {
       for (const f of (work.files||[])) { try { await deleteObject(ref(storage,f.path)); } catch(e){} }
       await deleteDoc(doc(db,"works",work.id));
+      // 일정에서 작성된 작업일지라면, 연결된 일정을 다시 "예정" 상태로 되돌려서
+      // 다시 작업일지를 작성할 수 있게 한다 (일정을 볼 권한이 없는 팀원에게도 일관되게 동작하도록,
+      // "작업일지가 사라짐"과 "권한이 없어서 안 보임"을 구분하지 않고 항상 되돌린다).
+      if (work.scheduleId) {
+        try {
+          await updateDoc(doc(db,"schedules",work.scheduleId), {
+            status:"예정", workId:null, completedByUid:null, completedByName:null,
+            updatedAt:new Date().toISOString(),
+          });
+        } catch(e) {}
+      }
       onDeleted(); onClose();
     } catch(e) { alert("삭제 오류: "+e.message); setDeleting(false); }
   };
@@ -376,12 +387,12 @@ function getWeeksInMonth(yearMonth) {
 }
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────
-export default function WorkList({ works, profile }) {
+export default function WorkList({ works, profile, initialFilter }) {
   const [viewMode, setViewMode] = useState("month"); // month | week | day
-  const [filterMonth, setFilterMonth] = useState(fmt.today().slice(0,7));
+  const [filterMonth, setFilterMonth] = useState(initialFilter?.month || fmt.today().slice(0,7));
   const [filterWeek, setFilterWeek] = useState(()=>getWeekRange(new Date()).start);
   const [filterDay, setFilterDay] = useState(fmt.today());
-  const [filterPay, setFilterPay] = useState("");
+  const [filterPay, setFilterPay] = useState(initialFilter?.payment || "");
   const [filterWorker, setFilterWorker] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -390,6 +401,16 @@ export default function WorkList({ works, profile }) {
   const [opinionCountByWork, setOpinionCountByWork] = useState({});
   const [quickLightbox, setQuickLightbox] = useState(null); // {images:[...], index:n}
   const [confirmingPaymentId, setConfirmingPaymentId] = useState(null); // 입금확인 처리 중인 작업 id
+  const [autoOpenedFor, setAutoOpenedFor] = useState(null); // 일정 화면에서 특정 작업으로 바로 이동한 workId 추적(중복 자동열기 방지)
+
+  // 일정 화면의 "작업일지 보기"에서 특정 workId로 넘어온 경우, 목록 필터와 무관하게 상세 모달을 바로 연다.
+  // works가 아직 로딩 중이어도(초기 빈 배열) works가 갱신될 때마다 다시 시도하되, 한 번 연 뒤에는 다시 열지 않는다.
+  useEffect(() => {
+    if (initialFilter?.workId && initialFilter.workId !== autoOpenedFor) {
+      const w = works.find(w => w.id === initialFilter.workId);
+      if (w) { setSelected(w); setAutoOpenedFor(initialFilter.workId); }
+    }
+  }, [initialFilter?.workId, works, autoOpenedFor]);
 
   // 외상 건을 "입금 확인" 처리 - 결제방식을 현금(cash)으로 전환한다.
   // (요구사항: 계좌이체 등 다른 수단으로 실제 받았더라도, 입금확인 시에는 무조건 현금으로 전환)
