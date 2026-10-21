@@ -1,12 +1,12 @@
 {
   "files": {
-    "main.js": "/baekan-app/static/js/main.897d8b75.js",
+    "main.js": "/baekan-app/static/js/main.18c07641.js",
     "static/js/475.3fa4067e.chunk.js": "/baekan-app/static/js/475.3fa4067e.chunk.js",
     "index.html": "/baekan-app/index.html",
-    "main.897d8b75.js.map": "/baekan-app/static/js/main.897d8b75.js.map",
+    "main.18c07641.js.map": "/baekan-app/static/js/main.18c07641.js.map",
     "475.3fa4067e.chunk.js.map": "/baekan-app/static/js/475.3fa4067e.chunk.js.map"
   },
   "entrypoints": [
-    "static/js/main.897d8b75.js"
+    "static/js/main.18c07641.js"
   ]
 }
